@@ -3,7 +3,7 @@ from langchain_core.tools import tool
 from src.vector_store import search
 
 
-@tool
+@tool(description="Retrieve relevant documents from the knowledge base.")
 def retrieve_from_knowledge_base(question: str) -> str:
     results = search(query=question, k=5)
     
