@@ -38,39 +38,41 @@ text_splitter = RecursiveCharacterTextSplitter(
 )
 
 
-def _get_file_hash(file_path: Path) -> str:
-    """Generate a hash for a file to track if it's been processed."""
-    return hashlib.md5(file_path.read_bytes()).hexdigest()
+def _get_content_hash(content: str) -> str:
+    """Generate a hash for content to use as document identifier."""
+    return hashlib.md5(content.encode('utf-8')).hexdigest()
 
 
-def add_document(file_path: Path, content: str) -> None:
-    """Add a document to the vector store after chunking."""
-    # Generate file hash for deduplication
-    file_hash = _get_file_hash(file_path)
+def add_document(content: str, file_name: str = None) -> str:
+    """Add a document to the vector store after chunking.
     
-    # Check if file already exists in collection
-    existing = collection.get(where={"file_path": str(file_path)})
+    Returns the content hash that identifies this document.
+    """
+    # Generate content hash as the document identifier
+    doc_hash = _get_content_hash(content)
+    
+    # Check if document with this hash already exists
+    existing = collection.get(where={"doc_hash": doc_hash})
     if existing["ids"]:
-        # Delete old chunks for this file
+        # Delete old chunks for this document
         collection.delete(ids=existing["ids"])
     
     # Split document into chunks
     chunks = text_splitter.split_text(content)
     
     if not chunks:
-        return
+        return doc_hash
     
     # Generate embeddings for all chunks
     chunk_embeddings = embeddings.embed_documents(chunks)
     
     # Prepare data for ChromaDB
-    ids = [f"{file_path.stem}_{i}" for i in range(len(chunks))]
+    ids = [f"{doc_hash}_{i}" for i in range(len(chunks))]
     metadatas = [
         {
-            "file_path": str(file_path),
-            "file_name": file_path.name,
+            "doc_hash": doc_hash,
+            "file_name": file_name or f"doc_{doc_hash[:8]}.txt",
             "chunk_index": i,
-            "file_hash": file_hash
         }
         for i in range(len(chunks))
     ]
@@ -82,6 +84,8 @@ def add_document(file_path: Path, content: str) -> None:
         documents=chunks,
         metadatas=metadatas
     )
+    
+    return doc_hash
 
 
 def search(query: str, k: int = 3) -> List[dict]:
@@ -105,7 +109,7 @@ def search(query: str, k: int = 3) -> List[dict]:
             metadata = results["metadatas"][0][i] if results["metadatas"] and results["metadatas"][0] else {}
             retrieved_chunks.append({
                 "content": doc,
-                "source": metadata.get("file_name", "unknown"),
+                "source": metadata.get("doc_hash", "unknown"),
                 "score": results["distances"][0][i] if results["distances"] and results["distances"][0] else None
             })
     
@@ -121,27 +125,33 @@ def load_existing_files() -> None:
     for file_path in KNOWLEDGE_DIR.glob("*.txt"):
         try:
             content = file_path.read_text(encoding="utf-8")
-            add_document(file_path, content)
+            add_document(content, file_name=file_path.name)
         except Exception as e:
             print(f"Error loading {file_path}: {e}")
 
 
-def delete_document(file_name: str) -> bool:
-    """Delete a document and all its chunks from the vector store."""
-    existing = collection.get(where={"file_name": file_name})
+def delete_document(doc_hash: str) -> bool:
+    """Delete a document and all its chunks from the vector store by hash."""
+    existing = collection.get(where={"doc_hash": doc_hash})
     if existing["ids"]:
         collection.delete(ids=existing["ids"])
         return True
     return False
 
 
+def document_exists(doc_hash: str) -> bool:
+    """Check if a document with the given hash exists."""
+    existing = collection.get(where={"doc_hash": doc_hash})
+    return len(existing["ids"]) > 0
+
+
 def list_documents() -> List[str]:
-    """List all unique document names in the vector store."""
+    """List all unique document hashes in the vector store."""
     all_docs = collection.get()
-    unique_files = set()
+    unique_hashes = set()
     if all_docs["metadatas"]:
         for metadata in all_docs["metadatas"]:
-            if metadata and "file_name" in metadata:
-                unique_files.add(metadata["file_name"])
-    return sorted(list(unique_files))
+            if metadata and "doc_hash" in metadata:
+                unique_hashes.add(metadata["doc_hash"])
+    return sorted(list(unique_hashes))
 

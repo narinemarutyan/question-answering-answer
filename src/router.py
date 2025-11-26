@@ -23,7 +23,6 @@ def needs_knowledge_base(question: str) -> bool:
 
 
 def route_question(question: str) -> RouteDecision:
-    """Return 'kb' if the question should consult the local knowledge base, else 'llm'."""
     return "kb" if needs_knowledge_base(question) else "llm"
 
 
