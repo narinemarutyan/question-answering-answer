@@ -3,3 +3,4 @@
 chat_history.db
 .idea
 **/knowledge
+**/vector_db
