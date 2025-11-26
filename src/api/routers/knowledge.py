@@ -1,125 +1,184 @@
-"""Knowledge base management endpoints for RAG."""
+# src/api/routers/knowledge.py
 
 from pathlib import Path
-from typing import List
-
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 from src.vector_store import add_document, delete_document, list_documents
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-KNOWLEDGE_DIR = BASE_DIR / "knowledge"
-
 knowledge_router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
 
+# ---------------------------
+# Request/Response Models
+# ---------------------------
+
 class DocumentListResponse(BaseModel):
-    documents: List[str]
+    documents: list[str]
 
 
-@knowledge_router.post("/upload")
+class DeleteDocumentRequest(BaseModel):
+    file_name: str
+
+
+class AddDocumentRequest(BaseModel):
+    file_name: str
+    content: str
+
+
+class DeleteDocumentResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class DocumentResponse(BaseModel):
+    success: bool
+    message: str
+    file_name: str
+    is_duplicate: bool
+
+
+# ---------------------------
+# Endpoints
+# ---------------------------
+
+@knowledge_router.get("/list", response_model=DocumentListResponse)
+def list_knowledge_documents():
+    """List all documents in the knowledge base."""
+    documents = list_documents()
+    return {"documents": documents}
+
+
+@knowledge_router.post("/upload", response_model=DocumentResponse)
 async def upload_document(file: UploadFile = File(...)):
-    """Upload a .txt file to the knowledge base.
+    """Upload a text file to the knowledge base.
     
-    The file will be chunked, embedded, and added to the vector store for RAG retrieval.
+    The file will be processed, chunked, and added to the vector store.
+    If a file with the same name already exists, it will be replaced.
     """
-    # Validate file extension
+    # Only accept .txt files
     if not file.filename.endswith('.txt'):
         raise HTTPException(
             status_code=400,
             detail="Only .txt files are supported"
         )
     
-    # Read file content
     try:
+        # Read file content
         content = await file.read()
-        text_content = content.decode('utf-8')
+        content_str = content.decode('utf-8')
+        
+        # Create file path in knowledge directory
+        from src.vector_store import KNOWLEDGE_DIR
+        KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)
+        file_path = KNOWLEDGE_DIR / file.filename
+        
+        # Check if document already exists
+        is_duplicate = file_path.exists() or file.filename in list_documents()
+        
+        # Save file to disk
+        file_path.write_text(content_str, encoding='utf-8')
+        
+        # Add to vector store (will replace if exists)
+        add_document(file_path, content_str)
+        
+        message = (
+            f"Document '{file.filename}' updated and re-indexed successfully"
+            if is_duplicate
+            else f"Document '{file.filename}' uploaded and indexed successfully"
+        )
+        
+        return {
+            "success": True,
+            "message": message,
+            "file_name": file.filename,
+            "is_duplicate": is_duplicate
+        }
     except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error uploading document: {str(e)}"
+        )
+
+
+@knowledge_router.post("/add", response_model=DocumentResponse)
+def add_document_text(payload: AddDocumentRequest):
+    """Add a document to the knowledge base by providing text content directly.
+    
+    Request body:
+    {
+        "file_name": "example.txt",
+        "content": "The text content of the document..."
+    }
+    """
+    file_name = payload.file_name
+    content = payload.content
+    
+    if not file_name.endswith('.txt'):
         raise HTTPException(
             status_code=400,
-            detail=f"Error reading file: {str(e)}"
+            detail="File name must end with .txt"
         )
     
-    # Save file to knowledge directory
-    KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)
-    file_path = KNOWLEDGE_DIR / file.filename
-    
     try:
-        file_path.write_text(text_content, encoding='utf-8')
+        from src.vector_store import KNOWLEDGE_DIR
+        KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)
+        file_path = KNOWLEDGE_DIR / file_name
+        
+        # Check if document already exists
+        is_duplicate = file_path.exists() or file_name in list_documents()
+        
+        # Save file to disk
+        file_path.write_text(content, encoding='utf-8')
+        
+        # Add to vector store (will replace if exists)
+        add_document(file_path, content)
+        
+        message = (
+            f"Document '{file_name}' updated and re-indexed successfully"
+            if is_duplicate
+            else f"Document '{file_name}' added and indexed successfully"
+        )
+        
+        return {
+            "success": True,
+            "message": message,
+            "file_name": file_name,
+            "is_duplicate": is_duplicate
+        }
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error saving file: {str(e)}"
+            detail=f"Error adding document: {str(e)}"
         )
-    
-    # Add to vector store
-    try:
-        is_update, is_duplicate_content = add_document(file_path, text_content)
-    except Exception as e:
-        # If vector store fails, still keep the file
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error adding to vector store: {str(e)}"
-        )
-    
-    # Provide informative message based on what happened
-    if is_update:
-        message = f"File '{file.filename}' updated successfully (replaced existing file with same name)"
-    elif is_duplicate_content:
-        message = f"File '{file.filename}' uploaded successfully (note: same content already exists with different filename)"
-    else:
-        message = f"File '{file.filename}' uploaded and processed successfully"
-    
-    return {
-        "message": message,
-        "filename": file.filename,
-        "is_update": is_update,
-        "is_duplicate_content": is_duplicate_content
-    }
 
 
-@knowledge_router.get("/list", response_model=DocumentListResponse)
-def list_knowledge_documents():
-    """List all documents in the knowledge base."""
-    documents = list_documents()
-    return DocumentListResponse(documents=documents)
-
-
-@knowledge_router.delete("/delete/{filename}")
-def delete_knowledge_document(filename: str):
-    """Delete a document from the knowledge base.
-    
-    This removes the file and all its chunks from the vector store.
-    """
-    # Validate filename (security: prevent path traversal)
-    if '..' in filename or '/' in filename or '\\' in filename:
-        raise HTTPException(status_code=400, detail="Invalid filename")
-    
-    file_path = KNOWLEDGE_DIR / filename
+@knowledge_router.delete("/delete", response_model=DeleteDocumentResponse)
+def delete_knowledge_document(payload: DeleteDocumentRequest):
+    """Delete a document from the knowledge base."""
+    file_name = payload.file_name
     
     # Delete from vector store
-    deleted_from_store = delete_document(filename)
+    deleted = delete_document(file_name)
     
-    # Delete file if it exists
-    file_deleted = False
-    if file_path.exists():
-        try:
-            file_path.unlink()
-            file_deleted = True
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error deleting file: {str(e)}"
-            )
-    
-    if not deleted_from_store and not file_deleted:
+    if not deleted:
         raise HTTPException(
             status_code=404,
-            detail=f"Document '{filename}' not found"
+            detail=f"Document '{file_name}' not found in knowledge base"
         )
     
+    # Also delete from disk
+    try:
+        from src.vector_store import KNOWLEDGE_DIR
+        file_path = KNOWLEDGE_DIR / file_name
+        if file_path.exists():
+            file_path.unlink()
+    except Exception as e:
+        # If file deletion fails, that's okay - it's already removed from vector store
+        pass
+    
     return {
-        "message": f"Document '{filename}' deleted successfully"
+        "success": True,
+        "message": f"Document '{file_name}' deleted successfully"
     }
 

@@ -38,39 +38,27 @@ text_splitter = RecursiveCharacterTextSplitter(
 )
 
 
+def _get_file_hash(file_path: Path) -> str:
+    """Generate a hash for a file to track if it's been processed."""
+    return hashlib.md5(file_path.read_bytes()).hexdigest()
 
 
-def add_document(file_path: Path, content: str) -> tuple[bool, bool]:
-    """Add a document to the vector store after chunking.
+def add_document(file_path: Path, content: str) -> None:
+    """Add a document to the vector store after chunking."""
+    # Generate file hash for deduplication
+    file_hash = _get_file_hash(file_path)
     
-    Returns:
-        (is_update, is_duplicate_content): 
-        - is_update: True if file with same name already existed
-        - is_duplicate_content: True if same content (hash) already exists with different name
-    """
-    # Generate file hash for content-based deduplication
-    file_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
-    
-    # Check if file with same name already exists
-    existing_by_name = collection.get(where={"file_name": file_path.name})
-    is_update = len(existing_by_name["ids"]) > 0
-    
-    # Check if same content (hash) already exists with different filename
-    existing_by_hash = collection.get(where={"file_hash": file_hash})
-    is_duplicate_content = (
-        len(existing_by_hash["ids"]) > 0 and 
-        (not is_update or existing_by_hash["metadatas"][0][0].get("file_name") != file_path.name)
-    )
-    
-    # Delete old chunks if updating by name
-    if is_update:
-        collection.delete(ids=existing_by_name["ids"])
+    # Check if file already exists in collection
+    existing = collection.get(where={"file_path": str(file_path)})
+    if existing["ids"]:
+        # Delete old chunks for this file
+        collection.delete(ids=existing["ids"])
     
     # Split document into chunks
     chunks = text_splitter.split_text(content)
     
     if not chunks:
-        return (is_update, is_duplicate_content)
+        return
     
     # Generate embeddings for all chunks
     chunk_embeddings = embeddings.embed_documents(chunks)
@@ -94,8 +82,6 @@ def add_document(file_path: Path, content: str) -> tuple[bool, bool]:
         documents=chunks,
         metadatas=metadatas
     )
-    
-    return (is_update, is_duplicate_content)
 
 
 def search(query: str, k: int = 3) -> List[dict]:

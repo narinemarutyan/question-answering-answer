@@ -5,22 +5,23 @@ from src.vector_store import search
 
 @tool
 def retrieve_from_knowledge_base(question: str) -> str:
-    """Look up information in the local knowledge base using semantic search.
-
-    This tool uses RAG (Retrieval Augmented Generation) to find relevant information
-    from uploaded documents. It performs semantic similarity search to retrieve the
-    most relevant chunks of text related to the question.
+    """Look up information in the local knowledge base using semantic search (RAG).
+    
+    This tool uses vector embeddings to find the most relevant chunks from the 
+    knowledge base that match the question semantically. Returns the top relevant 
+    excerpts with their source file names.
     """
-    results = search(question, k=3)
+    # Use semantic search to find relevant chunks
+    results = search(query=question, k=5)
     
     if not results:
-        return "No relevant information found in the knowledge base."
+        return "No relevant information found in the knowledge base. The knowledge base may be empty or the question doesn't match any stored content."
     
-    # Format results with source attribution
+    # Format results with source information
     formatted_results = []
-    for result in results:
-        source = result.get("source", "unknown")
-        content = result.get("content", "")
+    for chunk in results:
+        source = chunk.get("source", "unknown")
+        content = chunk.get("content", "")
         formatted_results.append(f"From {source}:\n{content}")
     
     return "\n\n---\n\n".join(formatted_results)

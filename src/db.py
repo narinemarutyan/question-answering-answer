@@ -96,6 +96,13 @@ def list_sessions() -> List[Session]:
     return [Session(id=row["id"], created_at=row["created_at"]) for row in rows]
 
 
+def session_exists(session_id: int) -> bool:
+    """Check if a session with the given ID exists."""
+    with get_connection() as conn:
+        cursor = conn.execute("SELECT 1 FROM sessions WHERE id = ?", (session_id,))
+        return cursor.fetchone() is not None
+
+
 def delete_session(session_id: int) -> bool:
     """Delete a chat session and all its messages. Returns True if session or messages existed."""
     with get_connection() as conn:
