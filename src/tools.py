@@ -1,53 +1,28 @@
-import os
-from pathlib import Path
-
 from langchain_core.tools import tool
 
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-KNOWLEDGE_DIR = BASE_DIR / "knowledge"
+from src.vector_store import search
 
 
 @tool
 def retrieve_from_knowledge_base(question: str) -> str:
-    """Look up information in the local text knowledge base to help answer the question.
+    """Look up information in the local knowledge base using semantic search.
 
-    The knowledge base consists of simple `.txt` files under the `knowledge` directory.
-    This tool returns short, relevant excerpts (or all contents if the base is tiny).
+    This tool uses RAG (Retrieval Augmented Generation) to find relevant information
+    from uploaded documents. It performs semantic similarity search to retrieve the
+    most relevant chunks of text related to the question.
     """
-    if not KNOWLEDGE_DIR.exists():
-        return "No local knowledge base found."
-
-    question_lower = question.lower()
-    snippets: list[str] = []
-
-    for file in KNOWLEDGE_DIR.glob("*.txt"):
-        try:
-            text = file.read_text(encoding="utf-8")
-        except Exception:
-            continue
-
-        text_lower = text.lower()
-        # Very simple relevance heuristic: check if any question word appears in the file.
-        # If nothing matches, we still allow returning short contents for tiny KBs.
-        if any(word in text_lower for word in question_lower.split()):
-            snippets.append(f"From {file.name}:\n{text.strip()}")
-
-    if not snippets:
-        # Fallback: return all contents if the KB is small.
-        all_texts: list[str] = []
-        for file in KNOWLEDGE_DIR.glob("*.txt"):
-            try:
-                text = file.read_text(encoding="utf-8")
-            except Exception:
-                continue
-            all_texts.append(f"From {file.name}:\n{text.strip()}")
-
-        if not all_texts:
-            return "Knowledge base is empty."
-
-        return "\n\n".join(all_texts)
-
-    return "\n\n".join(snippets)
+    results = search(question, k=3)
+    
+    if not results:
+        return "No relevant information found in the knowledge base."
+    
+    # Format results with source attribution
+    formatted_results = []
+    for result in results:
+        source = result.get("source", "unknown")
+        content = result.get("content", "")
+        formatted_results.append(f"From {source}:\n{content}")
+    
+    return "\n\n---\n\n".join(formatted_results)
 
 
