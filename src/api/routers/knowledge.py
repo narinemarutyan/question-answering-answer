@@ -34,7 +34,6 @@ class DeleteDocumentResponse(BaseModel):
 
 class DocumentResponse(BaseModel):
     success: bool
-    message: str
     doc_hash: str
     is_duplicate: bool
 
