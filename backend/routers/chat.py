@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from src.agents import kb_agent
-from src.db import add_message, delete_session, get_messages, list_sessions, session_exists
+from ai.agents import kb_agent
+from backend.db import add_message, delete_session, get_messages, list_sessions, session_exists
 
 chat_router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -82,3 +82,4 @@ def delete_chat(chat_id: int):
     delete_session(chat_id)
 
     return None
+

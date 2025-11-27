@@ -1,11 +1,11 @@
-# src/api/routers/knowledge.py
+"""Knowledge base API endpoints."""
 
 import hashlib
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
-from src.vector_store import add_document, delete_document, list_documents, document_exists
+from ai.vector_store import add_document, delete_document, list_documents, document_exists
 
 knowledge_router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -110,3 +110,4 @@ def delete_knowledge_document(payload: DeleteDocumentRequest):
         "success": True,
         "message": f"Document with hash '{doc_hash}' deleted successfully"
     }
+

@@ -1,6 +1,6 @@
 from langchain_core.tools import tool
 
-from src.vector_store import search
+from ai.vector_store import search
 
 
 @tool(description=(
@@ -29,5 +29,4 @@ def retrieve_from_knowledge_base(question: str) -> str:
         formatted_results.append(f"From document {source_display}:\n{content}")
     
     return "\n\n---\n\n".join(formatted_results)
-
 

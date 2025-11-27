@@ -1,8 +1,8 @@
 from fastapi import FastAPI
-from .routers.chat import chat_router
-from .routers.knowledge import knowledge_router
-from src.db import init_db
-from src.vector_store import load_existing_files
+from backend.routers.chat import chat_router
+from backend.routers.knowledge import knowledge_router
+from backend.db import init_db
+from ai.vector_store import load_existing_files
 
 app = FastAPI(title="Q&A Agent API")
 
@@ -16,3 +16,4 @@ async def startup_event():
     """Initialize database and load knowledge files on startup."""
     init_db()
     load_existing_files()
+

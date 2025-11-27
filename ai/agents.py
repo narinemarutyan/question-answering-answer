@@ -1,8 +1,8 @@
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 
-from src.config import API_KEY
-from src.tools import retrieve_from_knowledge_base
+from ai.config import API_KEY
+from ai.tools import retrieve_from_knowledge_base
 
 llm = ChatOpenAI(
     model_name="gpt-4.1",
@@ -24,3 +24,4 @@ kb_agent = create_agent(
         "seems to require specific stored information, use the tool to search the knowledge base."
     ),
 )
+

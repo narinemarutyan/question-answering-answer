@@ -3,6 +3,15 @@
 ### Objective
 Agent that answers questions using OpenAI and a local knowledge base.
 
+### Project Structure
+
+The project is organized into three main components:
+
+- **`frontend/`** - Streamlit web UI
+- **`backend/`** - FastAPI REST API
+- **`ai/`** - AI components (agents, tools, vector store)
+- **`src/`** - Shared utilities (database, configuration)
+
 ### What this project does
 
 Q&A agent using:
@@ -20,12 +29,12 @@ Q&A agent using:
   ```
 - Set `OPENAI_API_KEY` (via `.env` or environment variable)
 
-### How to run (FastAPI)
+### How to run (Backend - FastAPI)
 
 Start the API server:
 
 ```bash
-poetry run uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+poetry run uvicorn backend.app:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Then open the interactive Swagger UI:
@@ -55,4 +64,20 @@ From there you can:
 
 - **Delete a chat**:  
   - Endpoint: `DELETE /chat/delete?chat_id=1` (e.g. `DELETE /chat/delete?chat_id=1`)
+
+### How to run (Frontend - Streamlit UI)
+
+Start the Streamlit web interface:
+
+```bash
+poetry run streamlit run frontend/app.py
+```
+
+The UI will open automatically in your browser at `http://localhost:8501`.
+
+**Features:**
+- 💬 **Chat Interface**: Ask questions and get answers from the agent
+- 📚 **Knowledge Base Management**: Upload `.txt` files to the knowledge base
+- 📝 **Chat History**: View and manage multiple chat sessions
+- 🔍 **Smart Search**: The agent automatically searches the knowledge base when needed
 

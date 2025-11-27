@@ -13,7 +13,7 @@ from chromadb.config import Settings
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from src.config import API_KEY
+from ai.config import API_KEY
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 KNOWLEDGE_DIR = BASE_DIR / "knowledge"
