@@ -1,8 +1,14 @@
 """Streamlit UI for the Question-Answering Agent."""
 
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
+
 import streamlit as st
 from datetime import datetime
-from pathlib import Path
 
 from ai.agents import kb_agent
 from backend.db import (
