@@ -49,8 +49,30 @@ def list_knowledge_documents():
     return {"documents": documents}
 
 
+@knowledge_router.post("/add", response_model=DocumentResponse)
+def add_document_endpoint(payload: AddDocumentRequest):
+    """Add a document to the knowledge base via JSON content."""
+    try:
+        doc_hash = hashlib.md5(payload.content.encode('utf-8')).hexdigest()
+        is_duplicate = document_exists(doc_hash)
+
+        add_document(payload.content, file_name=payload.file_name)
+
+        return {
+            "success": True,
+            "doc_hash": doc_hash,
+            "is_duplicate": is_duplicate
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error adding document: {str(e)}"
+        )
+
+
 @knowledge_router.post("/upload", response_model=DocumentResponse)
 async def upload_document(file: UploadFile = File(...)):
+    """Upload a document file to the knowledge base."""
     try:
         content = await file.read()
         content_str = content.decode('utf-8')
@@ -59,7 +81,6 @@ async def upload_document(file: UploadFile = File(...)):
         is_duplicate = document_exists(doc_hash)
 
         add_document(content_str, file_name=file.filename)
-
 
         return {
             "success": True,

@@ -1,8 +1,12 @@
 """Vector store for RAG using ChromaDB and OpenAI embeddings."""
 
 import hashlib
+import os
 from pathlib import Path
 from typing import List
+
+# Disable ChromaDB telemetry before importing
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
 
 import chromadb
 from chromadb.config import Settings
